@@ -1,1 +1,3 @@
 datapreprocessing.ipynb
+*.png
+__pycache__

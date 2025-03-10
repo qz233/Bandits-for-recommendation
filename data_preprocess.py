@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, csc_matrix
 
 
 file_path = "./ml-100k"
@@ -37,26 +37,31 @@ def load_ratings_data(file_path, range, full_users=None, full_movies=None):
 
 
 class Environment:
-    def __init__(self, ground_truth_rating, initial_rating):
+    def __init__(self, ground_truth_rating, initial_rating, replace=False, sigma=0.5):
+        self.replace = replace
+        self.sigma = sigma
         self.gt_rating = ground_truth_rating
         self.prev_rating = initial_rating.copy()
 
     def option(self, user_id):
         gt_movies = set(self.gt_rating[user_id].indices)
         prev_movies = set(self.prev_rating[user_id].indices)
-
-        available_movies = list(gt_movies - prev_movies)
+        if self.replace:
+            available_movies = list(gt_movies)
+        else:
+            available_movies = list(gt_movies - prev_movies)
         return sorted(available_movies)
 
     def update(self, user_id, movie_id):
         options = self.option(user_id)
-        rating = self.gt_rating[user_id, movie_id]
+        rating = self.gt_rating[user_id, movie_id] + np.random.randn() * self.sigma  #Adding noise to avoid certain numerical issues 
         best_rating = self.gt_rating[user_id, options].max()
-        new_rating = csr_matrix(([rating], ([user_id], [movie_id])),
+        if self.prev_rating[user_id, movie_id] == 0:
+            new_rating = csr_matrix(([rating], ([user_id], [movie_id])),
                                 shape=self.prev_rating.shape, dtype=np.float64)
-        self.prev_rating += new_rating  
+            self.prev_rating += new_rating  
         #self.prev_rating[user_id, movie_id] = rating
-        return rating, best_rating - rating
+        return rating, best_rating - self.gt_rating[user_id, movie_id]
 
 
 if __name__ == "__main__":
